@@ -1,0 +1,394 @@
+# =============================================================================
+# EAAGF Agent Manifest Template
+# Enterprise AI Agent Governance Framework — v1
+# =============================================================================
+#
+# This manifest is the canonical declaration format used to register AI agents
+# with the EAAGF Agent_Registry. Every agent deployed in the enterprise MUST
+# be registered using a manifest that conforms to this schema.
+#
+# Usage:
+#   1. Copy this template and fill in all required fields.
+#   2. Remove example comments and placeholder values.
+#   3. Submit via the Agent_Registry bulk registration API or CLI.
+#
+# References:
+#   - Specification: docs/eaagf-specification/02-agent-identity-standard.md
+#   - Registration Guide: docs/guidelines/agent-registration-guide.md
+#   - Risk Assessment Guide: docs/guidelines/risk-assessment-guide.md
+#
+# Requirements: 1.2 (agent record fields), 1.9 (bulk manifest), 6.9 (manifest format)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# API version — MUST be "eaagf/v1". Future versions will increment this value.
+# ---------------------------------------------------------------------------
+apiVersion: eaagf/v1
+
+# ---------------------------------------------------------------------------
+# Kind — MUST be "AgentManifest". Identifies this document as an agent
+# registration manifest.
+# ---------------------------------------------------------------------------
+kind: AgentManifest
+
+# ===========================================================================
+# metadata — Identity and ownership information for the agent.
+# All fields in this section are REQUIRED.
+# ===========================================================================
+metadata:
+
+  # name (REQUIRED)
+  # A human-readable identifier for the agent. Must be unique within the
+  # owning team's namespace. Use kebab-case (lowercase, hyphens).
+  # Constraints: 3–128 characters, pattern: ^[a-z0-9][a-z0-9-]*[a-z0-9]$
+  name: "my-agent-name"
+
+  # version (REQUIRED)
+  # Semantic version of the agent (https://semver.org). Each new version is
+  # registered as a distinct agent record linked to its predecessor.
+  # Format: MAJOR.MINOR.PATCH (e.g., "1.0.0", "2.3.1")
+  version: "1.0.0"
+
+  # owning_team (REQUIRED)
+  # The team responsible for this agent. Must match a team identifier in the
+  # enterprise directory. Ownership changes are audited (Requirement 1.8).
+  owning_team: "team-name"
+
+  # platform (REQUIRED)
+  # The deployment platform for this agent. Must be one of the supported
+  # EAAGF platforms. If the agent spans multiple platforms, submit one
+  # manifest per platform — the highest Risk_Tier applies (Requirement 2.10).
+  # Allowed values:
+  #   DATABRICKS | SALESFORCE | SNOWFLAKE | COPILOT_STUDIO | AWS | AZURE | GCP
+  platform: "DATABRICKS"
+
+# ===========================================================================
+# spec — Governance specification for the agent.
+# Defines capabilities, permissions, oversight, and constraints.
+# ===========================================================================
+spec:
+
+  # -------------------------------------------------------------------------
+  # risk_tier (REQUIRED)
+  # The risk classification tier assigned after completing the risk
+  # assessment questionnaire. Determines credential TTL, oversight mode
+  # defaults, re-validation periods, and approval requirements.
+  #
+  # Allowed values:
+  #   T1 — Informational  (read-only, non-sensitive, human approves every action)
+  #   T2 — Transactional  (writes on internal data, human-in-loop for writes)
+  #   T3 — Autonomous     (autonomous on confidential data, multi-step writes)
+  #   T4 — Critical       (restricted data, external systems, financial ops)
+  #
+  # See: docs/eaagf-specification/03-risk-classification-standard.md
+  # -------------------------------------------------------------------------
+  risk_tier: "T2"
+
+  # -------------------------------------------------------------------------
+  # capabilities (REQUIRED)
+  # List of capability types this agent will exercise. Used by the Policy
+  # Engine to scope authorization decisions.
+  #
+  # Allowed values:
+  #   TOOL_CALL            — Agent invokes tools via MCP
+  #   DATA_READ            — Agent reads data from enterprise sources
+  #   DATA_WRITE           — Agent writes/modifies data
+  #   AGENT_DELEGATION     — Agent delegates sub-tasks to other agents via A2A
+  #   EXTERNAL_CONNECTION  — Agent connects to systems outside the enterprise
+  # -------------------------------------------------------------------------
+  capabilities:
+    - TOOL_CALL
+    - DATA_READ
+
+  # -------------------------------------------------------------------------
+  # declared_permissions (REQUIRED)
+  # Explicit list of resources and actions the agent is authorized to use.
+  # The Policy Engine enforces least-privilege: any action not declared here
+  # is denied with PERMISSION_NOT_DECLARED (Requirement 3.1, 3.3).
+  #
+  # Each entry:
+  #   resource — URI identifying the target resource
+  #   actions  — List of permitted operations on that resource
+  # -------------------------------------------------------------------------
+  declared_permissions:
+    - resource: "snowflake://analytics/sales/forecast"
+      actions: ["SELECT"]
+    - resource: "salesforce://sobject/Opportunity"
+      actions: ["READ"]
+
+  # -------------------------------------------------------------------------
+  # approved_mcp_servers (REQUIRED if TOOL_CALL capability is declared)
+  # List of MCP server URIs from the enterprise MCP directory that this
+  # agent is authorized to connect to. Connections to servers not in this
+  # list are blocked with UNAPPROVED_MCP_SERVER (Requirement 6.6).
+  #
+  # Format: mcp://enterprise-catalog/<server-name>
+  # -------------------------------------------------------------------------
+  approved_mcp_servers:
+    - "mcp://enterprise-catalog/snowflake-query"
+
+  # -------------------------------------------------------------------------
+  # approved_egress_endpoints (REQUIRED if EXTERNAL_CONNECTION capability)
+  # Allowlist of network endpoints the agent may connect to. The Policy
+  # Engine blocks outbound connections to any endpoint not listed here
+  # with EGRESS_NOT_ALLOWED (Requirement 3.5).
+  #
+  # Supports exact hostnames and wildcard prefixes (e.g., "*.salesforce.com").
+  # -------------------------------------------------------------------------
+  approved_egress_endpoints:
+    - "api.internal.company.com"
+
+  # -------------------------------------------------------------------------
+  # data_classifications_accessed (REQUIRED)
+  # The highest data classification levels this agent will access. Used to
+  # determine compartment requirements and data governance controls.
+  #
+  # Allowed values: PUBLIC | INTERNAL | CONFIDENTIAL | RESTRICTED
+  # If CONFIDENTIAL or RESTRICTED, a Context_Compartment is mandatory.
+  # -------------------------------------------------------------------------
+  data_classifications_accessed:
+    - "INTERNAL"
+
+  # -------------------------------------------------------------------------
+  # oversight_mode (REQUIRED)
+  # The human oversight mode applied to this agent. T4 agents default to
+  # APPROVAL_REQUIRED and cannot be set to FULL_AUTO without AI Governance
+  # Team authorization (Requirement 5.2).
+  #
+  # Allowed values:
+  #   FULL_AUTO          — No human gates (restricted; requires authorization)
+  #   SUPERVISED         — Gates on write operations (default for T2)
+  #   APPROVAL_REQUIRED  — Gates on all non-trivial actions (default for T3/T4)
+  #   HUMAN_IN_LOOP      — Human approves every action (default for T1)
+  # -------------------------------------------------------------------------
+  oversight_mode: "SUPERVISED"
+
+  # -------------------------------------------------------------------------
+  # max_session_duration_seconds (OPTIONAL)
+  # Maximum duration of a single agent task session in seconds. After this
+  # period, all session credentials are revoked (Requirement 3.6).
+  #
+  # Defaults:
+  #   T1/T2: 3600  (1 hour)
+  #   T3/T4: 900   (15 minutes)
+  # -------------------------------------------------------------------------
+  max_session_duration_seconds: 3600
+
+  # -------------------------------------------------------------------------
+  # max_actions_per_minute (OPTIONAL)
+  # Rate limit for agent actions. Exceeding this triggers throttling and a
+  # RATE_LIMIT_EXCEEDED event (Requirement 8.6).
+  #
+  # Defaults:
+  #   T1/T2: 100
+  #   T3/T4: 20
+  # -------------------------------------------------------------------------
+  max_actions_per_minute: 100
+
+  # -------------------------------------------------------------------------
+  # context_compartments (REQUIRED if accessing CONFIDENTIAL or RESTRICTED data)
+  # Named isolation scopes that prevent cross-contamination of sensitive
+  # data between agent tasks (Requirement 7.2). Access to resources outside
+  # declared compartments is denied with COMPARTMENT_VIOLATION.
+  # -------------------------------------------------------------------------
+  context_compartments: []
+
+  # -------------------------------------------------------------------------
+  # geographic_constraints (OPTIONAL)
+  # Regions where the agent is authorized to process data. Enforced for
+  # GDPR/CCPA-scoped data (Requirement 7.7).
+  #
+  # Use ISO 3166-1 alpha-2 country codes or region identifiers (e.g., "EU").
+  # -------------------------------------------------------------------------
+  geographic_constraints: []
+
+  # -------------------------------------------------------------------------
+  # protocols_supported (REQUIRED)
+  # Interoperability protocols this agent supports. MCP_1_0 is the baseline
+  # requirement for all agents (Requirement 6.1). A2A_1_0 is required if
+  # AGENT_DELEGATION capability is declared.
+  #
+  # Allowed values: MCP_1_0 | A2A_1_0
+  # -------------------------------------------------------------------------
+  protocols_supported:
+    - "MCP_1_0"
+
+
+# =============================================================================
+# EXAMPLES — One manifest per Risk Tier (T1–T4)
+# =============================================================================
+
+# =============================================================================
+# Example 1: T1 — Informational Agent
+# A read-only FAQ bot that retrieves public knowledge base articles.
+# Human approves every action. Lowest governance overhead.
+# =============================================================================
+---
+apiVersion: eaagf/v1
+kind: AgentManifest
+metadata:
+  name: "kb-faq-bot"
+  version: "1.0.0"
+  owning_team: "customer-support"
+  platform: "SALESFORCE"
+spec:
+  risk_tier: "T1"
+  capabilities:
+    - TOOL_CALL
+    - DATA_READ
+  declared_permissions:
+    - resource: "salesforce://sobject/Knowledge__kav"
+      actions: ["READ"]
+  approved_mcp_servers:
+    - "mcp://enterprise-catalog/salesforce-knowledge"
+  approved_egress_endpoints: []
+  data_classifications_accessed:
+    - "PUBLIC"
+  oversight_mode: "HUMAN_IN_LOOP"
+  max_session_duration_seconds: 3600   # T1 default: 1 hour
+  max_actions_per_minute: 100          # T1 default
+  context_compartments: []
+  geographic_constraints: []
+  protocols_supported:
+    - "MCP_1_0"
+
+# =============================================================================
+# Example 2: T2 — Transactional Agent
+# A sales forecast agent that reads analytics data and writes forecast
+# records. Human-in-loop for write operations.
+# =============================================================================
+---
+apiVersion: eaagf/v1
+kind: AgentManifest
+metadata:
+  name: "sales-forecast-agent"
+  version: "1.2.0"
+  owning_team: "revenue-analytics"
+  platform: "DATABRICKS"
+spec:
+  risk_tier: "T2"
+  capabilities:
+    - TOOL_CALL
+    - DATA_READ
+    - DATA_WRITE
+  declared_permissions:
+    - resource: "snowflake://analytics/sales/forecast"
+      actions: ["SELECT", "INSERT"]
+    - resource: "salesforce://sobject/Opportunity"
+      actions: ["READ"]
+  approved_mcp_servers:
+    - "mcp://enterprise-catalog/snowflake-query"
+    - "mcp://enterprise-catalog/salesforce-crm"
+  approved_egress_endpoints:
+    - "api.internal.company.com"
+  data_classifications_accessed:
+    - "INTERNAL"
+    - "CONFIDENTIAL"
+  oversight_mode: "SUPERVISED"
+  max_session_duration_seconds: 3600   # T2 default: 1 hour
+  max_actions_per_minute: 100          # T2 default
+  context_compartments:
+    - "sales-analytics-context"
+  geographic_constraints:
+    - "US"
+    - "EU"
+  protocols_supported:
+    - "MCP_1_0"
+
+# =============================================================================
+# Example 3: T3 — Autonomous Agent
+# A compliance monitoring agent that autonomously scans confidential HR
+# data and generates compliance reports. Multi-step write operations
+# without per-action human approval.
+# =============================================================================
+---
+apiVersion: eaagf/v1
+kind: AgentManifest
+metadata:
+  name: "hr-compliance-scanner"
+  version: "2.0.0"
+  owning_team: "people-analytics"
+  platform: "AZURE"
+spec:
+  risk_tier: "T3"
+  capabilities:
+    - TOOL_CALL
+    - DATA_READ
+    - DATA_WRITE
+    - AGENT_DELEGATION
+  declared_permissions:
+    - resource: "azure://sql/hr-db/employees"
+      actions: ["SELECT"]
+    - resource: "azure://blob/compliance-reports"
+      actions: ["READ", "WRITE"]
+    - resource: "snowflake://hr/compensation/summary"
+      actions: ["SELECT"]
+  approved_mcp_servers:
+    - "mcp://enterprise-catalog/azure-sql"
+    - "mcp://enterprise-catalog/azure-blob"
+    - "mcp://enterprise-catalog/snowflake-query"
+  approved_egress_endpoints: []
+  data_classifications_accessed:
+    - "INTERNAL"
+    - "CONFIDENTIAL"
+  oversight_mode: "APPROVAL_REQUIRED"
+  max_session_duration_seconds: 900    # T3 default: 15 minutes
+  max_actions_per_minute: 20           # T3 default
+  context_compartments:
+    - "hr-compliance-context"
+  geographic_constraints:
+    - "EU"
+  protocols_supported:
+    - "MCP_1_0"
+    - "A2A_1_0"
+
+# =============================================================================
+# Example 4: T4 — Critical Agent
+# A financial trading agent that executes transactions on restricted data,
+# connects to external market APIs, and delegates to sub-agents. Highest
+# governance controls. Requires AI Governance Team approval for production.
+# =============================================================================
+---
+apiVersion: eaagf/v1
+kind: AgentManifest
+metadata:
+  name: "trade-execution-agent"
+  version: "3.1.0"
+  owning_team: "quantitative-trading"
+  platform: "AWS"
+spec:
+  risk_tier: "T4"
+  capabilities:
+    - TOOL_CALL
+    - DATA_READ
+    - DATA_WRITE
+    - AGENT_DELEGATION
+    - EXTERNAL_CONNECTION
+  declared_permissions:
+    - resource: "aws://dynamodb/trade-orders"
+      actions: ["READ", "WRITE", "DELETE"]
+    - resource: "aws://s3/market-data-restricted"
+      actions: ["READ"]
+    - resource: "snowflake://finance/positions/current"
+      actions: ["SELECT", "INSERT", "UPDATE"]
+  approved_mcp_servers:
+    - "mcp://enterprise-catalog/aws-dynamodb"
+    - "mcp://enterprise-catalog/aws-s3"
+    - "mcp://enterprise-catalog/snowflake-query"
+  approved_egress_endpoints:
+    - "api.marketdata-provider.com"
+    - "fix.exchange-gateway.com"
+  data_classifications_accessed:
+    - "CONFIDENTIAL"
+    - "RESTRICTED"
+  oversight_mode: "APPROVAL_REQUIRED"  # T4 default; FULL_AUTO prohibited without AI Gov authorization
+  max_session_duration_seconds: 900    # T4 default: 15 minutes
+  max_actions_per_minute: 20           # T4 default
+  context_compartments:
+    - "trading-restricted-context"
+    - "market-data-context"
+  geographic_constraints:
+    - "US"
+  protocols_supported:
+    - "MCP_1_0"
+    - "A2A_1_0"

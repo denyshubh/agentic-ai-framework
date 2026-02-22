@@ -1,0 +1,118 @@
+{
+  "_comment": "==========================================================================",
+  "_title": "EAAGF Conformance Profile Template",
+  "_description": [
+    "This template defines the Conformance Profile schema that all agents and",
+    "Platform Adapters MUST populate to declare their capabilities, permissions,",
+    "and oversight requirements. The Governance Controller validates this profile",
+    "against the EAAGF conformance schema before accepting agent registrations.",
+    "",
+    "References:",
+    "  - Specification: docs/eaagf-specification/07-interoperability-standard.md",
+    "  - Requirements: 6.4 (conformance validation), 6.5 (conformance schema)",
+    "",
+    "Validation Rules:",
+    "  - All fields marked REQUIRED must be present.",
+    "  - schema_version must be '1.0'.",
+    "  - agent_id must be a valid UUID v4 (assigned at registration).",
+    "  - capabilities must contain at least one valid value.",
+    "  - oversight_mode must match the Risk Tier defaults unless overridden.",
+    "  - T4 agents cannot set oversight_mode to FULL_AUTO.",
+    "  - If AGENT_DELEGATION is in capabilities, protocols_supported must include A2A_1_0.",
+    "  - If CONFIDENTIAL or RESTRICTED is in data_classifications_accessed,",
+    "    context_compartments must contain at least one entry.",
+    "  - max_session_duration_seconds must not exceed 3600 (T1/T2) or 900 (T3/T4).",
+    "  - max_actions_per_minute must not exceed 100 (T1/T2) or 20 (T3/T4)."
+  ],
+  "_comment_end": "========================================================================",
+
+  "schema_version": "1.0",
+  "_schema_version_comment": "REQUIRED. Must be '1.0'. Identifies the conformance schema version.",
+
+  "agent_id": "00000000-0000-0000-0000-000000000000",
+  "_agent_id_comment": "REQUIRED. UUID v4 assigned by the Agent_Registry at registration time.",
+
+  "capabilities": ["TOOL_CALL", "DATA_READ"],
+  "_capabilities_comment": [
+    "REQUIRED. Array of capability types this agent exercises.",
+    "Allowed values: TOOL_CALL, DATA_READ, DATA_WRITE, AGENT_DELEGATION, EXTERNAL_CONNECTION.",
+    "Must contain at least one value."
+  ],
+
+  "declared_permissions": [
+    {
+      "resource": "snowflake://db/schema/table",
+      "actions": ["SELECT"]
+    }
+  ],
+  "_declared_permissions_comment": [
+    "REQUIRED. Array of resource-action pairs defining the agent's authorized scope.",
+    "Each entry must have:",
+    "  resource — URI identifying the target resource (platform-specific format).",
+    "  actions  — Array of permitted operations (e.g., SELECT, READ, WRITE, UPDATE, DELETE, INSERT).",
+    "Any action not declared here is denied with PERMISSION_NOT_DECLARED."
+  ],
+
+  "approved_mcp_servers": ["mcp://enterprise-catalog/example-server"],
+  "_approved_mcp_servers_comment": [
+    "REQUIRED if TOOL_CALL is in capabilities. Array of MCP server URIs from the",
+    "enterprise MCP directory. Connections to unlisted servers are blocked with",
+    "UNAPPROVED_MCP_SERVER. Format: mcp://enterprise-catalog/<server-name>"
+  ],
+
+  "approved_egress_endpoints": ["api.internal.company.com"],
+  "_approved_egress_endpoints_comment": [
+    "REQUIRED if EXTERNAL_CONNECTION is in capabilities. Allowlist of network",
+    "endpoints the agent may connect to. Supports exact hostnames and wildcard",
+    "prefixes (e.g., '*.salesforce.com'). Unlisted endpoints are blocked with",
+    "EGRESS_NOT_ALLOWED."
+  ],
+
+  "data_classifications_accessed": ["INTERNAL"],
+  "_data_classifications_accessed_comment": [
+    "REQUIRED. Array of data classification levels this agent accesses.",
+    "Allowed values: PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED.",
+    "If CONFIDENTIAL or RESTRICTED is present, context_compartments must be non-empty."
+  ],
+
+  "oversight_mode": "SUPERVISED",
+  "_oversight_mode_comment": [
+    "REQUIRED. The human oversight mode applied to this agent.",
+    "Allowed values: FULL_AUTO, SUPERVISED, APPROVAL_REQUIRED, HUMAN_IN_LOOP.",
+    "Defaults by tier: T1=HUMAN_IN_LOOP, T2=SUPERVISED, T3=APPROVAL_REQUIRED, T4=APPROVAL_REQUIRED.",
+    "T4 agents CANNOT be set to FULL_AUTO without AI Governance Team authorization."
+  ],
+
+  "max_session_duration_seconds": 3600,
+  "_max_session_duration_seconds_comment": [
+    "OPTIONAL. Maximum task session duration in seconds. Credentials are revoked after this period.",
+    "Constraints: T1/T2 max 3600, T3/T4 max 900. Defaults: T1/T2=3600, T3/T4=900."
+  ],
+
+  "max_actions_per_minute": 100,
+  "_max_actions_per_minute_comment": [
+    "OPTIONAL. Rate limit for agent actions per minute.",
+    "Constraints: T1/T2 max 100, T3/T4 max 20. Exceeding triggers RATE_LIMIT_EXCEEDED."
+  ],
+
+  "context_compartments": [],
+  "_context_compartments_comment": [
+    "REQUIRED if accessing CONFIDENTIAL or RESTRICTED data. Array of named isolation",
+    "scopes that prevent cross-contamination of sensitive data between tasks.",
+    "Access outside declared compartments is denied with COMPARTMENT_VIOLATION."
+  ],
+
+  "geographic_constraints": [],
+  "_geographic_constraints_comment": [
+    "OPTIONAL. Array of regions where the agent may process data.",
+    "Use ISO 3166-1 alpha-2 codes or region identifiers (e.g., 'EU', 'US').",
+    "Enforced for GDPR/CCPA-scoped data."
+  ],
+
+  "protocols_supported": ["MCP_1_0"],
+  "_protocols_supported_comment": [
+    "REQUIRED. Interoperability protocols supported by this agent.",
+    "Allowed values: MCP_1_0, A2A_1_0.",
+    "MCP_1_0 is mandatory for all agents. A2A_1_0 is required if AGENT_DELEGATION is declared."
+  ]
+}
